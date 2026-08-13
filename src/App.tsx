@@ -9,6 +9,7 @@ import { NotePanel } from './components/NotePanel';
 import { QuestionCard } from './components/QuestionCard';
 import { QuestionEditModal } from './components/QuestionEditModal';
 import { StatsPanel } from './components/StatsPanel';
+import { Toast } from './components/Toast';
 import type { AnswerResult, AuthResponse, Note, Question, ScopeStats, Topic } from './types';
 
 type View = 'topics' | 'quiz';
@@ -49,6 +50,8 @@ export default function App() {
   const [question, setQuestion] = useState<Question | null>(null);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
+  /** Favori/pasif işlemlerinden sonra birkaç saniyeliğine gösterilen bilgi mesajı. */
+  const [actionToast, setActionToast] = useState<string | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   /** Son sorulan soruların id'leri; tekrarı önlemek için sunucuya gönderilir. */
@@ -371,6 +374,7 @@ export default function App() {
         favoriteCount: Math.max(0, s.favoriteCount + (isFavorite ? 1 : -1)),
       }));
       void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
+      setActionToast(isFavorite ? 'Favorilere eklendi.' : 'Favorilerden çıkarıldı.');
     } catch (err) {
       setQuizError(err instanceof Error ? err.message : 'Favori güncellenemedi.');
     }
@@ -389,6 +393,7 @@ export default function App() {
         inactiveCount: Math.max(0, s.inactiveCount + (isInactive ? 1 : -1)),
       }));
       void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
+      setActionToast(isInactive ? 'Soru aktif olmayanlara taşındı.' : 'Soru tekrar aktif edildi.');
     } catch (err) {
       setQuizError(err instanceof Error ? err.message : 'Durum güncellenemedi.');
     }
@@ -752,6 +757,8 @@ export default function App() {
         onClose={() => setDeletingTopic(null)}
         onDeleted={(topicId) => setTopics((prev) => prev.filter((t) => t.id !== topicId))}
       />
+
+      <Toast message={actionToast} onDone={() => setActionToast(null)} />
     </div>
   );
 }
