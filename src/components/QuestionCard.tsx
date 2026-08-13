@@ -23,6 +23,7 @@ interface Props {
   onToggleInactive: () => void;
   onToggleStats: () => void;
   statsOpen: boolean;
+  onEdit: () => void;
   prioritizeHard: boolean;
   onPrioritizeHardChange: (value: boolean) => void;
 }
@@ -42,6 +43,7 @@ export function QuestionCard({
   onToggleInactive,
   onToggleStats,
   statsOpen,
+  onEdit,
   prioritizeHard,
   onPrioritizeHardChange,
 }: Props) {
@@ -146,11 +148,18 @@ export function QuestionCard({
               <button
                 className={`inactive-btn${question.isInactive ? ' active' : ''}`}
                 onClick={onToggleInactive}
-                title={question.isInactive ? 'Aktif hale getir' : 'Pasifleştir'}
+                title={question.isInactive ? 'Aktif hale getir' : 'Pasifleştir (bir daha sorulmasın)'}
                 aria-label={question.isInactive ? 'Aktif hale getir' : 'Pasifleştir'}
                 aria-pressed={question.isInactive}
               >
-                {question.isInactive ? '🚫' : '○'}
+                {question.isInactive ? (
+                  '🚫'
+                ) : (
+                  <svg viewBox="0 0 20 20" width="17" height="17" fill="none" aria-hidden="true">
+                    <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M5 15 15 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                )}
               </button>
 
               <button
@@ -161,6 +170,15 @@ export function QuestionCard({
                 aria-pressed={statsOpen}
               >
                 📊
+              </button>
+
+              <button
+                className="edit-btn"
+                onClick={onEdit}
+                title="Soruyu düzenle"
+                aria-label="Soruyu düzenle"
+              >
+                ✎
               </button>
 
               {/* Cevaptan sonra güncel seviye, öncesinde sorunun mevcut seviyesi gösterilir. */}
@@ -225,10 +243,6 @@ export function QuestionCard({
             <button className="primary next-btn" disabled={loadingNext} onClick={onNext}>
               {loadingNext ? 'Yükleniyor…' : 'Sonraki soru →'}
             </button>
-          </div>
-
-          <div className="muted" style={{ marginTop: '0.7rem', fontSize: '0.85rem' }}>
-            Not: {question.noteTitle}
           </div>
         </div>
       </div>

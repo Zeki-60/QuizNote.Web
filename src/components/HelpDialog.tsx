@@ -71,6 +71,50 @@ export function HelpDialog({ open, onClose }: Props) {
 
           <div className="help-item">
             <span className="help-icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="17" height="17" fill="none">
+                <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M5 15 15 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </span>
+            <div>
+              <strong>Pasifleştir</strong>
+              <p>
+                Bu simgeye dokununca soru <strong>🚫 Aktif Olmayanlar</strong> listesine taşınır ve
+                artık normal akışta karşınıza çıkmaz. Bir soruyu artık görmek istemediğinizde kullanın;
+                Konular ekranındaki <strong>🚫 Aktif Olmayanlar</strong> kartından istediğiniz zaman
+                tekrar aktif hale getirebilirsiniz.
+              </p>
+            </div>
+          </div>
+
+          <div className="help-item">
+            <span className="help-icon" aria-hidden="true">
+              📊
+            </span>
+            <div>
+              <strong>İstatistikler</strong>
+              <p>
+                İçinde bulunduğunuz konu/liste hakkında toplam soru sayısı, favori ve pasif soru
+                sayıları ile seviye dağılımınızı gösteren bir panel açar.
+              </p>
+            </div>
+          </div>
+
+          <div className="help-item">
+            <span className="help-icon" aria-hidden="true">
+              ✎
+            </span>
+            <div>
+              <strong>Düzenle</strong>
+              <p>
+                Sorunun metnini ve şıklarını (ekleyip çıkararak, doğru/yanlış işaretleyerek)
+                değiştirebileceğiniz düzenleme ekranını açar.
+              </p>
+            </div>
+          </div>
+
+          <div className="help-item">
+            <span className="help-icon" aria-hidden="true">
               <span className="star filled">★</span>
               <span className="star filled">★</span>
               <span className="star">☆</span>

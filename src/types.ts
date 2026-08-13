@@ -70,6 +70,35 @@ export interface ScopeStats {
   inactiveCount: number;
 }
 
+/** Düzenleme ekranındaki şık: doğru/yanlış bilgisi dahil, havuzdaki TÜM şıklar. */
+export interface ChoiceEdit {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+  orderIndex: number;
+}
+
+/** Düzenleme ekranı için soru: tüm şıklar ve bağlı notun tam içeriğiyle. */
+export interface QuestionEdit {
+  id: string;
+  topicId: string;
+  type: QuestionTypeValue;
+  text: string;
+  isNegative: boolean;
+  explanation: string | null;
+  orderIndex: number;
+  noteId: string;
+  noteTitle: string;
+  noteBody: string;
+  choices: ChoiceEdit[];
+}
+
+/** Yeni soru eklerken gönderilen tek bir şık: metin + doğru/yanlış bilgisi. */
+export interface NewChoiceInput {
+  text: string;
+  isCorrect: boolean;
+}
+
 export interface AnswerResult {
   isCorrect: boolean;
   explanation: string | null;

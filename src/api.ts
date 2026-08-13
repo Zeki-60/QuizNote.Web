@@ -1,8 +1,11 @@
 import type {
   AnswerResult,
   AuthResponse,
+  ChoiceEdit,
+  NewChoiceInput,
   Note,
   Question,
+  QuestionEdit,
   ScopeStats,
   Topic,
 } from './types';
@@ -16,6 +19,16 @@ export const tokenStore = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
+/**
+ * Sunucu 401 döndürdüğünde (token süresi dolmuş/geçersiz) çağrılır. App.tsx bunu
+ * kullanıcıyı otomatik çıkışa düşürüp giriş ekranına yönlendirmek için dinler.
+ * İstek gönderirken zaten token yoksa (misafir kullanıcı) tetiklenmez.
+ */
+let onSessionExpired: (() => void) | null = null;
+export function setSessionExpiredHandler(handler: (() => void) | null) {
+  onSessionExpired = handler;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
   const headers = new Headers(init.headers);
@@ -25,6 +38,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
 
   if (!res.ok) {
+    if (res.status === 401 && token) {
+      onSessionExpired?.();
+      throw new Error('Oturumunuz sona erdi; lütfen tekrar giriş yapın.');
+    }
+
     // API hataları { message } döndürüyor; olmadığında durum kodunu göster.
     let message = `İstek başarısız (${res.status})`;
     try {
@@ -54,6 +72,24 @@ export const api = {
 
   getTopics: () => request<Topic[]>('/api/topics'),
 
+  createTopic: (payload: { name: string; description?: string | null }) =>
+    request<Topic>('/api/topics', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateTopic: (topicId: string, payload: { name: string; description?: string | null }) =>
+    request<Topic>(`/api/topics/${topicId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  /** Konuyu ve altındaki tüm not/soru/şıkları siler (cascade). */
+  deleteTopic: (topicId: string) =>
+    request<void>(`/api/topics/${topicId}`, {
+      method: 'DELETE',
+    }),
+
   /**
    * Sonsuz akış: havuzdan tek soru çeker. topicId verilmezse tüm konular havuza girer.
    * recentIds son sorulanları dışlar.
@@ -64,6 +100,7 @@ export const api = {
       prioritizeHard?: boolean;
       favoritesOnly?: boolean;
       inactiveOnly?: boolean;
+      myQuestionsOnly?: boolean;
       recentIds?: string[];
     } = {},
   ) => {
@@ -71,6 +108,7 @@ export const api = {
       prioritizeHard: String(opts.prioritizeHard ?? false),
       favoritesOnly: String(opts.favoritesOnly ?? false),
       inactiveOnly: String(opts.inactiveOnly ?? false),
+      myQuestionsOnly: String(opts.myQuestionsOnly ?? false),
     });
     if (opts.topicId) params.set('topicId', opts.topicId);
     if (opts.recentIds?.length) params.set('excludeIds', opts.recentIds.join(','));
@@ -89,12 +127,18 @@ export const api = {
     }),
 
   summary: () =>
-    request<{ totalQuestions: number; favoriteCount: number; inactiveCount: number }>(
-      '/api/me/summary',
-    ),
+    request<{
+      totalQuestions: number;
+      favoriteCount: number;
+      inactiveCount: number;
+      myQuestionsCount: number;
+    }>('/api/me/summary'),
 
   /** Soru kartının yanındaki bilgi kartı için: aktif kapsamın seviye/favori/pasif istatistikleri. */
-  getScopeStats: (opts: { scope: 'topic' | 'favorites' | 'inactive' | 'all'; topicId?: string | null }) => {
+  getScopeStats: (opts: {
+    scope: 'topic' | 'favorites' | 'inactive' | 'myQuestions' | 'all';
+    topicId?: string | null;
+  }) => {
     const params = new URLSearchParams({ scope: opts.scope });
     if (opts.topicId) params.set('topicId', opts.topicId);
     return request<ScopeStats>(`/api/me/scope-stats?${params}`);
@@ -113,4 +157,77 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  // --- Soru/Not düzenleme ---
+
+  /** Düzenleme ekranı için soruyu TÜM şıklarıyla (doğru/yanlış dahil) getirir. */
+  getQuestionForEdit: (questionId: string) =>
+    request<QuestionEdit>(`/api/questions/${questionId}/edit`),
+
+  updateQuestion: (questionId: string, payload: { text: string; isNegative: boolean; explanation: string | null }) =>
+    request<void>(`/api/questions/${questionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  updateNote: (noteId: string, payload: { title: string; body: string }) =>
+    request<void>(`/api/notes/${noteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  addChoice: (questionId: string, payload: { text: string; isCorrect: boolean }) =>
+    request<ChoiceEdit>(`/api/questions/${questionId}/choices`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateChoice: (choiceId: string, payload: { text: string; isCorrect: boolean }) =>
+    request<void>(`/api/choices/${choiceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteChoice: (choiceId: string) =>
+    request<void>(`/api/choices/${choiceId}`, {
+      method: 'DELETE',
+    }),
+
+  /** Kullanıcının arayüzden yeni soru eklemesi; not her zaman yeni oluşturulur. */
+  createUserQuestion: (payload: {
+    topicId: string;
+    noteTitle?: string | null;
+    noteBody?: string | null;
+    text: string;
+    explanation?: string | null;
+    choices: NewChoiceInput[];
+  }) =>
+    request<{ id: string }>('/api/questions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  /**
+   * Kullanıcının kendi eklediği soruları/notları DbSeeder formatında .txt olarak indirir.
+   * JSON değil düz metin döndüğü için genel request() yardımcısı kullanılmaz; dosya
+   * doğrudan tarayıcıda indirilir.
+   */
+  downloadMyQuestionsExport: async () => {
+    const token = tokenStore.get();
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    const res = await fetch(`${BASE_URL}/api/me/questions/export`, { headers });
+    if (!res.ok) throw new Error(`İndirme başarısız (${res.status})`);
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kendi-sorularim.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

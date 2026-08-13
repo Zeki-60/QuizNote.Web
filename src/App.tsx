@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, tokenStore } from './api';
+import { api, setSessionExpiredHandler, tokenStore } from './api';
+import { AddQuestionModal } from './components/AddQuestionModal';
+import { AddTopicModal } from './components/AddTopicModal';
 import { AuthForm } from './components/AuthForm';
+import { DeleteTopicModal } from './components/DeleteTopicModal';
+import { EditTopicModal } from './components/EditTopicModal';
 import { NotePanel } from './components/NotePanel';
 import { QuestionCard } from './components/QuestionCard';
+import { QuestionEditModal } from './components/QuestionEditModal';
 import { StatsPanel } from './components/StatsPanel';
 import type { AnswerResult, AuthResponse, Note, Question, ScopeStats, Topic } from './types';
 
@@ -23,15 +28,24 @@ export default function App() {
     return raw && tokenStore.get() ? (JSON.parse(raw) as AuthResponse) : null;
   });
 
+  /** 401 nedeniyle otomatik çıkış yapıldığında giriş ekranında gösterilecek uyarı. */
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
+
   const [view, setView] = useState<View>('topics');
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [summary, setSummary] = useState({ totalQuestions: 0, favoriteCount: 0, inactiveCount: 0 });
+  const [summary, setSummary] = useState({
+    totalQuestions: 0,
+    favoriteCount: 0,
+    inactiveCount: 0,
+    myQuestionsCount: 0,
+  });
   const [topicsError, setTopicsError] = useState<string | null>(null);
 
   /** Seçili konu; null ise tüm konular havuza girer. */
   const [activeTopic, setActiveTopic] = useState<Topic | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [inactiveOnly, setInactiveOnly] = useState(false);
+  const [myQuestionsOnly, setMyQuestionsOnly] = useState(false);
   const [question, setQuestion] = useState<Question | null>(null);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
@@ -49,6 +63,14 @@ export default function App() {
   /** İstatistikler paneli: aktif kapsamın seviye/favori/pasif dağılımı. */
   const [scopeStats, setScopeStats] = useState<ScopeStats | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+
+  /** Soru düzenleme modalı: açıkken düzenlenen sorunun id'si, kapalıyken null. */
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+
+  const [addTopicOpen, setAddTopicOpen] = useState(false);
+  const [addQuestionOpen, setAddQuestionOpen] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
+  const [deletingTopic, setDeletingTopic] = useState<Topic | null>(null);
 
   // "Zorlandıklarımı daha sık sor" tercihi; tarayıcıda saklanır.
   const [prioritizeHard, setPrioritizeHard] = useState(
@@ -76,7 +98,9 @@ export default function App() {
     try {
       const [list, sum] = await Promise.all([
         api.getTopics(),
-        api.summary().catch(() => ({ totalQuestions: 0, favoriteCount: 0, inactiveCount: 0 })),
+        api
+          .summary()
+          .catch(() => ({ totalQuestions: 0, favoriteCount: 0, inactiveCount: 0, myQuestionsCount: 0 })),
       ]);
       setTopics(list);
       setSummary(sum);
@@ -110,6 +134,7 @@ export default function App() {
     tokenStore.set(auth.token);
     localStorage.setItem(USER_KEY, JSON.stringify(auth));
     setUser(auth);
+    setSessionExpiredMessage(null);
   }
 
   function handleLogout() {
@@ -120,10 +145,36 @@ export default function App() {
     setView('topics');
   }
 
+  // Sunucu 401 döndürdüğünde (token süresi dolmuş) kullanıcıyı otomatik çıkışa
+  // düşür ve giriş ekranında bunu belirten bir mesaj göster.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      tokenStore.clear();
+      localStorage.removeItem(USER_KEY);
+      setUser(null);
+      resetQuiz();
+      setView('topics');
+      setSessionExpiredMessage('Oturumunuz sona erdi; lütfen tekrar giriş yapın.');
+    });
+    return () => setSessionExpiredHandler(null);
+    // resetQuiz her render'da yeniden oluştuğu için bağımlılığa eklenmez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleDownloadMyQuestions() {
+    try {
+      await api.downloadMyQuestionsExport();
+    } catch (err) {
+      // Sessiz geçilebilir bir işlem; hata olursa kısa bir uyarı yeterli.
+      window.alert(err instanceof Error ? err.message : 'İndirme başarısız oldu.');
+    }
+  }
+
   function resetQuiz() {
     setActiveTopic(null);
     setFavoritesOnly(false);
     setInactiveOnly(false);
+    setMyQuestionsOnly(false);
     setQuestion(null);
     setResult(null);
     setRecentIds([]);
@@ -150,7 +201,7 @@ export default function App() {
   /// topic null ise tüm konular havuza girer.
   async function loadNextQuestion(
     topic: Topic | null,
-    opts: { favoritesOnly: boolean; inactiveOnly: boolean; recent: string[] },
+    opts: { favoritesOnly: boolean; inactiveOnly: boolean; myQuestionsOnly: boolean; recent: string[] },
   ) {
     setLoadingQuestion(true);
     setQuizError(null);
@@ -161,6 +212,7 @@ export default function App() {
         prioritizeHard,
         favoritesOnly: opts.favoritesOnly,
         inactiveOnly: opts.inactiveOnly,
+        myQuestionsOnly: opts.myQuestionsOnly,
         recentIds: opts.recent,
       });
 
@@ -179,12 +231,20 @@ export default function App() {
     }
   }
 
-  /** Aktif kapsamın (konu/favoriler/aktif olmayanlar/tümü) bilgi kartını tazeler. */
+  /** Aktif kapsamın (konu/favoriler/aktif olmayanlar/kendi sorularım/tümü) bilgi kartını tazeler. */
   async function refreshScopeStats(
     topic: Topic | null,
-    opts: { favoritesOnly: boolean; inactiveOnly: boolean },
+    opts: { favoritesOnly: boolean; inactiveOnly: boolean; myQuestionsOnly: boolean },
   ) {
-    const scope = opts.inactiveOnly ? 'inactive' : opts.favoritesOnly ? 'favorites' : topic ? 'topic' : 'all';
+    const scope = opts.inactiveOnly
+      ? 'inactive'
+      : opts.favoritesOnly
+        ? 'favorites'
+        : opts.myQuestionsOnly
+          ? 'myQuestions'
+          : topic
+            ? 'topic'
+            : 'all';
     try {
       setScopeStats(await api.getScopeStats({ scope, topicId: topic?.id ?? null }));
     } catch {
@@ -192,18 +252,24 @@ export default function App() {
     }
   }
 
-  /// topic null ise tüm konulardan sorulur. mode: 'all' | 'favorites' | 'inactive'.
-  async function startTopic(topic: Topic | null, mode: 'all' | 'favorites' | 'inactive' = 'all') {
+  /// topic null ise tüm konulardan sorulur. mode: 'all' | 'favorites' | 'inactive' | 'myQuestions'.
+  async function startTopic(
+    topic: Topic | null,
+    mode: 'all' | 'favorites' | 'inactive' | 'myQuestions' = 'all',
+  ) {
     const onlyFavorites = mode === 'favorites';
     const onlyInactive = mode === 'inactive';
+    const onlyMyQuestions = mode === 'myQuestions';
     setActiveTopic(topic);
     setFavoritesOnly(onlyFavorites);
     setInactiveOnly(onlyInactive);
+    setMyQuestionsOnly(onlyMyQuestions);
     setRecentIds([]);
     setView('quiz');
+    const opts = { favoritesOnly: onlyFavorites, inactiveOnly: onlyInactive, myQuestionsOnly: onlyMyQuestions };
     await Promise.all([
-      loadNextQuestion(topic, { favoritesOnly: onlyFavorites, inactiveOnly: onlyInactive, recent: [] }),
-      refreshScopeStats(topic, { favoritesOnly: onlyFavorites, inactiveOnly: onlyInactive }),
+      loadNextQuestion(topic, { ...opts, recent: [] }),
+      refreshScopeStats(topic, opts),
     ]);
   }
 
@@ -227,7 +293,7 @@ export default function App() {
       // Cevap yanıtı notu zaten taşıyor; panel açılırsa ek istek gerekmez.
       setNote(res.note);
       // Seviye değişmiş olabilir; bilgi kartındaki dağılım güncellensin.
-      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly });
+      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
     } catch (err) {
       setQuizError(err instanceof Error ? err.message : 'Cevap gönderilemedi.');
     } finally {
@@ -240,7 +306,12 @@ export default function App() {
     // ekranda bırakmamak için normal akışa düşülür.
     if (favoritesOnly && summary.favoriteCount === 0) {
       setFavoritesOnly(false);
-      await loadNextQuestion(activeTopic, { favoritesOnly: false, inactiveOnly, recent: recentIds });
+      await loadNextQuestion(activeTopic, {
+        favoritesOnly: false,
+        inactiveOnly,
+        myQuestionsOnly,
+        recent: recentIds,
+      });
       return;
     }
 
@@ -248,11 +319,43 @@ export default function App() {
     // aynı şekilde normal akışa düşülür.
     if (inactiveOnly && summary.inactiveCount === 0) {
       setInactiveOnly(false);
-      await loadNextQuestion(activeTopic, { favoritesOnly, inactiveOnly: false, recent: recentIds });
+      await loadNextQuestion(activeTopic, {
+        favoritesOnly,
+        inactiveOnly: false,
+        myQuestionsOnly,
+        recent: recentIds,
+      });
       return;
     }
 
-    await loadNextQuestion(activeTopic, { favoritesOnly, inactiveOnly, recent: recentIds });
+    // Kendi sorularım modunda son soru da silinmişse/başkasına devredilmişse
+    // (şu an silme yok ama tutarlılık için) aynı fallback uygulanır.
+    if (myQuestionsOnly && summary.myQuestionsCount === 0) {
+      setMyQuestionsOnly(false);
+      await loadNextQuestion(activeTopic, {
+        favoritesOnly,
+        inactiveOnly,
+        myQuestionsOnly: false,
+        recent: recentIds,
+      });
+      return;
+    }
+
+    await loadNextQuestion(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly, recent: recentIds });
+  }
+
+  /** Düzenleme modalından kaydedince ekrandaki soru metnini ve (açıksa) notu günceller. */
+  async function refreshEditedQuestion() {
+    if (!question) return;
+    try {
+      const edited = await api.getQuestionForEdit(question.id);
+      setQuestion((q) => (q ? { ...q, text: edited.text, noteTitle: edited.noteTitle } : q));
+      if (note && note.id === edited.noteId) {
+        setNote({ ...note, title: edited.noteTitle, body: edited.noteBody });
+      }
+    } catch {
+      // Sessizce geç; kullanıcı isterse "Sonraki soru" ile zaten güncel veriyi görür.
+    }
   }
 
   async function toggleFavorite() {
@@ -267,7 +370,7 @@ export default function App() {
         ...s,
         favoriteCount: Math.max(0, s.favoriteCount + (isFavorite ? 1 : -1)),
       }));
-      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly });
+      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
     } catch (err) {
       setQuizError(err instanceof Error ? err.message : 'Favori güncellenemedi.');
     }
@@ -285,7 +388,7 @@ export default function App() {
         ...s,
         inactiveCount: Math.max(0, s.inactiveCount + (isInactive ? 1 : -1)),
       }));
-      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly });
+      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
     } catch (err) {
       setQuizError(err instanceof Error ? err.message : 'Durum güncellenemedi.');
     }
@@ -338,6 +441,7 @@ export default function App() {
           <div className="topbar-right">{themeSwitch}</div>
         </header>
         <main className="content">
+          {sessionExpiredMessage && <p className="error">{sessionExpiredMessage}</p>}
           <AuthForm onAuthenticated={handleAuthenticated} />
         </main>
       </div>
@@ -352,6 +456,22 @@ export default function App() {
         </div>
         <div className="topbar-right">
           <span>{user.displayName}</span>
+          <button
+            className="icon-btn download-btn"
+            onClick={() => void handleDownloadMyQuestions()}
+            title="Kendi sorularımı indir (.txt)"
+            aria-label="Kendi sorularımı indir"
+          >
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+              <path
+                d="M10 3v10m0 0-3.5-3.5M10 13l3.5-3.5M4 15.5h12"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           {themeSwitch}
           <button onClick={handleLogout}>Çıkış</button>
         </div>
@@ -360,7 +480,37 @@ export default function App() {
       <main className="content">
         {view === 'topics' && (
           <>
-            <h1 style={{ marginTop: 0 }}>Konular</h1>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h1 style={{ margin: 0 }}>Konular</h1>
+              <div className="row" style={{ gap: '0.6rem' }}>
+                <button className="fab-action fab-action--ghost" onClick={() => setAddQuestionOpen(true)}>
+                  <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                    <path
+                      d="M6 5h8a1 1 0 0 1 1 1v9.2a.8.8 0 0 1-1.24.67L10 14l-3.76 1.87A.8.8 0 0 1 5 15.2V6a1 1 0 0 1 1-1Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M8 8.2h4M8 10.4h2.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <circle cx="15" cy="6" r="3.4" className="fab-action-badge" />
+                    <path d="M15 4.6v2.8M13.6 6h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                  Soru ekle
+                </button>
+                <button className="fab-action" onClick={() => setAddTopicOpen(true)}>
+                  <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                    <path
+                      d="M4 5.5A1.5 1.5 0 0 1 5.5 4h3.1a1.5 1.5 0 0 1 1.06.44l1.4 1.4A1.5 1.5 0 0 0 12.12 6H14.5A1.5 1.5 0 0 1 16 7.5v7A1.5 1.5 0 0 1 14.5 16h-9A1.5 1.5 0 0 1 4 14.5v-9Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M10 9.2v4M8 11.2h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                  Konu ekle
+                </button>
+              </div>
+            </div>
 
             {topicsError && <p className="error">{topicsError}</p>}
 
@@ -373,7 +523,7 @@ export default function App() {
             )}
 
             <div className="topic-grid">
-              {/* Sıra sabit: 1) Tümü, 2) Favorilerim, 3) Aktif Olmayanlar, sonra konular. */}
+              {/* Sıra sabit: 1) Tümü, 2) Favorilerim, 3) Aktif Olmayanlar, 4) Kendi Sorularım, sonra konular. */}
               <button
                 className="card topic-card all-card"
                 disabled={summary.totalQuestions === 0}
@@ -409,14 +559,73 @@ export default function App() {
                 <strong>🚫 Aktif Olmayanlar</strong>
               </button>
 
+              <button
+                className="card topic-card my-questions-card"
+                disabled={summary.myQuestionsCount === 0}
+                title={
+                  summary.myQuestionsCount === 0
+                    ? 'Henüz kendi eklediğiniz bir soru yok'
+                    : 'Sadece kendi eklediğiniz soruları çalış'
+                }
+                onClick={() => void startTopic(null, 'myQuestions')}
+              >
+                <strong>📝 Kendi Sorularım</strong>
+              </button>
+
               {topics.map((topic) => (
-                <button
-                  key={topic.id}
-                  className="card topic-card"
-                  onClick={() => void startTopic(topic)}
-                >
-                  <strong>{topic.name}</strong>
-                </button>
+                <div key={topic.id} className="card topic-card topic-card-editable">
+                  <button
+                    type="button"
+                    className="topic-card-main"
+                    onClick={() => void startTopic(topic)}
+                  >
+                    <strong>{topic.name}</strong>
+                  </button>
+
+                  <div className="topic-card-actions">
+                    <button
+                      type="button"
+                      className="topic-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTopic(topic);
+                      }}
+                      title="Konuyu düzenle"
+                      aria-label="Konuyu düzenle"
+                    >
+                      <svg viewBox="0 0 20 20" width="14" height="14" fill="none" aria-hidden="true">
+                        <path
+                          d="M13.5 3.5l3 3L7 16H4v-3l9.5-9.5z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      Düzenle
+                    </button>
+                    <button
+                      type="button"
+                      className="topic-action-btn topic-delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingTopic(topic);
+                      }}
+                      title="Konuyu sil"
+                      aria-label="Konuyu sil"
+                    >
+                      <svg viewBox="0 0 20 20" width="14" height="14" fill="none" aria-hidden="true">
+                        <path
+                          d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m2 0-.6 9.6a1.5 1.5 0 0 1-1.5 1.4H8.1a1.5 1.5 0 0 1-1.5-1.4L6 6"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      Sil
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </>
@@ -447,14 +656,18 @@ export default function App() {
                     ? '🚫 Aktif Olmayanlar'
                     : favoritesOnly
                       ? '♥ Favorilerim'
-                      : (activeTopic?.name ?? 'Tümü')
+                      : myQuestionsOnly
+                        ? '📝 Kendi Sorularım'
+                        : (activeTopic?.name ?? 'Tümü')
                 }
                 totalQuestions={
                   inactiveOnly
                     ? summary.inactiveCount
                     : favoritesOnly
                       ? summary.favoriteCount
-                      : (activeTopic?.questionCount ?? summary.totalQuestions)
+                      : myQuestionsOnly
+                        ? summary.myQuestionsCount
+                        : (activeTopic?.questionCount ?? summary.totalQuestions)
                 }
                 onSubmit={submitAnswer}
                 onNext={() => void nextQuestion()}
@@ -468,6 +681,7 @@ export default function App() {
                   setStatsOpen((v) => !v);
                 }}
                 statsOpen={statsOpen}
+                onEdit={() => setEditingQuestionId(question.id)}
                 prioritizeHard={prioritizeHard}
                 onPrioritizeHardChange={togglePrioritizeHard}
               />
@@ -497,9 +711,46 @@ export default function App() {
             ? '🚫 Aktif Olmayanlar'
             : favoritesOnly
               ? '♥ Favorilerim'
-              : (activeTopic?.name ?? 'Tümü')
+              : myQuestionsOnly
+                ? '📝 Kendi Sorularım'
+                : (activeTopic?.name ?? 'Tümü')
         }
         onClose={() => setStatsOpen(false)}
+      />
+
+      <QuestionEditModal
+        questionId={editingQuestionId}
+        onClose={() => setEditingQuestionId(null)}
+        onSaved={() => void refreshEditedQuestion()}
+      />
+
+      <AddTopicModal
+        open={addTopicOpen}
+        onClose={() => setAddTopicOpen(false)}
+        onCreated={(topic) => setTopics((prev) => [...prev, topic].sort((a, b) => a.name.localeCompare(b.name)))}
+      />
+
+      <AddQuestionModal
+        open={addQuestionOpen}
+        topics={topics}
+        onClose={() => setAddQuestionOpen(false)}
+        onCreated={() => void loadTopics()}
+      />
+
+      <EditTopicModal
+        topic={editingTopic}
+        onClose={() => setEditingTopic(null)}
+        onUpdated={(updated) =>
+          setTopics((prev) =>
+            prev.map((t) => (t.id === updated.id ? updated : t)).sort((a, b) => a.name.localeCompare(b.name)),
+          )
+        }
+      />
+
+      <DeleteTopicModal
+        topic={deletingTopic}
+        onClose={() => setDeletingTopic(null)}
+        onDeleted={(topicId) => setTopics((prev) => prev.filter((t) => t.id !== topicId))}
       />
     </div>
   );

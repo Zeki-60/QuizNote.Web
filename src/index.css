@@ -88,7 +88,69 @@ button.primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-input {
+button.danger {
+  background: var(--wrong);
+  border-color: var(--wrong);
+  color: #fff;
+}
+
+button.danger:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+/* "Konu ekle" / "Soru ekle" gibi baş eylem düğmeleri: gradient dolgu + hafif kalkma. */
+button.fab-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.1rem 0.6rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 2px var(--shadow), 0 8px 20px -10px var(--accent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+button.fab-action svg {
+  flex: none;
+}
+
+button.fab-action:hover:not(:disabled) {
+  border-color: transparent;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px var(--shadow), 0 12px 28px -8px var(--accent);
+  filter: brightness(1.06);
+}
+
+button.fab-action:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.97);
+}
+
+/* İkincil eylem: dolgusuz, sadece ikonu ve kenarlığı vurgulu — birincil "Konu ekle"nin gölgesinde kalır. */
+button.fab-action--ghost {
+  background: var(--surface-2);
+  color: var(--accent);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+button.fab-action--ghost .fab-action-badge {
+  fill: var(--accent);
+  stroke: none;
+}
+
+button.fab-action--ghost:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 4px 14px -6px var(--shadow);
+  filter: none;
+}
+
+input:not([type='checkbox']):not([type='radio']) {
   font: inherit;
   width: 100%;
   padding: 0.6rem 0.75rem;
@@ -96,6 +158,13 @@ input {
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
 }
 
 input:focus {
@@ -257,6 +326,362 @@ input:focus {
   color: var(--accent);
 }
 
+/* --- Soru düzenleme (kalem) ikonu: aynı boyut/geçiş deseni --- */
+.edit-btn {
+  width: 2rem;
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.15rem;
+  line-height: 1;
+  transition: color 0.15s, transform 0.15s;
+}
+
+.edit-btn:hover:not(:disabled) {
+  color: var(--accent);
+  transform: scale(1.12);
+}
+
+/* --- Soru düzenleme modalı --- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px var(--shadow);
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.modal-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  padding: 0.15rem 0;
+}
+
+.field-inline input[type='checkbox'] {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.modal textarea,
+.modal input[type='text'],
+.note-title-input {
+  font: inherit;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  resize: vertical;
+}
+
+/* Zengin metin editörü: textarea ile aynı görünüm, ama gerçek kalın/renkli metin gösterir. */
+.rich-note-editor {
+  font: inherit;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  overflow-y: auto;
+  max-height: 40vh;
+}
+
+.rich-note-editor:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.rich-note-editor p {
+  margin: 0 0 0.6rem;
+}
+
+.rich-note-editor p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-note-editor ul {
+  margin: 0 0 0.6rem;
+  padding-left: 1.2rem;
+}
+
+.rich-note-editor h4 {
+  margin: 0.8rem 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.bold-btn {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.bold-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* İmleç/seçim o biçimin içindeyken buton "basılı" görünür. */
+.bold-btn.active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.format-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
+}
+
+.color-btn {
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.color-btn:hover {
+  transform: scale(1.15);
+  border-color: var(--text);
+}
+
+.color-btn-red {
+  background: var(--wrong);
+}
+
+/* İmleç/seçim bu renkteyken kenar parlar (dış halka + ışıltı). */
+.color-btn.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor;
+  transform: scale(1.1);
+}
+
+.color-btn-red.active {
+  color: var(--wrong);
+}
+
+.edit-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.edit-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.edit-choice-row.is-correct {
+  border-color: var(--correct);
+  background: var(--correct-bg);
+}
+
+.edit-choice-row.is-wrong {
+  border-color: var(--wrong);
+  background: var(--wrong-bg);
+}
+
+.edit-choice-correct {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  width: 4.5rem;
+  font-size: 0.7rem;
+  text-align: center;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.edit-choice-row.is-correct .edit-choice-correct {
+  color: var(--correct);
+  font-weight: 600;
+}
+
+.edit-choice-row.is-wrong .edit-choice-correct {
+  color: var(--wrong);
+}
+
+.edit-choice-text {
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.delete-choice-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  padding: 0.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.delete-choice-btn:hover {
+  color: var(--wrong);
+}
+
+.confirm-delete {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--wrong);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.confirm-delete button {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.add-choice-row {
+  margin-top: 0.6rem;
+  padding-top: 0.9rem;
+  border: none;
+  border-top: 1px dashed var(--border);
+  border-radius: 0;
+  background: none;
+}
+
+.add-choice-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.add-choice-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.add-choice-btn:disabled {
+  opacity: 0.5;
+}
+
+.add-choice-text-btn {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+  background: none;
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.add-choice-text-btn:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
 /* --- İstatistikler paneli: Not paneliyle aynı desende, sağdan kayarak açılır --- */
 .stats-panel {
   position: fixed;
@@ -301,32 +726,109 @@ input:focus {
   gap: 0.5rem;
 }
 
-.scope-stats-row {
+/* --- İstatistik kutucukları: Toplam / Favori / Aktif olmayan --- */
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+.stat-tile {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid var(--border);
+  gap: 0.3rem;
+  padding: 0.9rem 0.5rem;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
-.scope-stats-row:last-child {
-  border-bottom: none;
+.stat-tile-icon {
+  display: inline-flex;
+  color: var(--accent);
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
-.scope-stats-levels {
-  margin-top: 0.4rem;
+.stat-tile-fav .stat-tile-icon {
+  color: var(--fav);
+}
+
+.stat-tile-inactive .stat-tile-icon {
+  color: var(--inactive);
+}
+
+.stat-tile-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-tile-label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* --- Seviye dağılımı bölümü --- */
+.stats-section {
+  margin-top: 1.4rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.7rem;
 }
 
-.scope-stats-level-list {
+.stats-section-title {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.level-bar-list {
   display: flex;
   flex-direction: column;
+  gap: 0.55rem;
 }
 
-.scope-stats-level-list .scope-stats-row {
-  padding: 0.25rem 0;
+.level-bar-row {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr 2rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.level-bar-label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.level-bar-track {
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.level-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+/* Seviye arttıkça (0 -> zayıf, 5 -> güçlü) kırmızıdan yeşile geçen bir renk skalası. */
+.level-bar-fill-0 { background: #ef4444; }
+.level-bar-fill-1 { background: #f97316; }
+.level-bar-fill-2 { background: #f59e0b; }
+.level-bar-fill-3 { background: #eab308; }
+.level-bar-fill-4 { background: #84cc16; }
+.level-bar-fill-5 { background: #22c55e; }
+
+.level-bar-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: right;
 }
 
 .muted {
@@ -355,6 +857,71 @@ input:focus {
   font-size: 0.9rem;
 }
 
+/* --- Modallardaki hata/uyarı bandı --- */
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.error-banner svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.error-banner-error {
+  background: var(--wrong-bg);
+  border: 1px solid var(--wrong);
+  color: var(--wrong);
+}
+
+.error-banner-warning {
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid #eab308;
+  color: #eab308;
+}
+
+/* --- Toast: viewport'un tam ortasında, modalların üzerinde beliren kısa ömürlü uyarı --- */
+.toast-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast-box {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(420px, 85vw);
+  padding: 0.9rem 1.2rem;
+  border-radius: var(--radius);
+  background: var(--wrong);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 12px 40px var(--shadow);
+  animation: toast-pop 0.2s ease-out;
+}
+
+@keyframes toast-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* --- Topics --- */
 .topic-grid {
   display: grid;
@@ -377,6 +944,62 @@ input:focus {
 .topic-card strong {
   font-size: 1.05rem;
   line-height: 1.35;
+}
+
+/* Kendi eklediğimiz konu kartları: <div> köke, üstte başlık, altta ✎/🗑 aksiyon satırı. */
+.topic-card-editable {
+  padding: 1.1rem 1.1rem 0.85rem;
+  gap: 0.6rem;
+  justify-content: flex-start;
+}
+
+.topic-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+.topic-action-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0;
+  border-radius: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.topic-action-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.topic-delete-btn {
+  color: var(--wrong);
+  border-color: var(--wrong);
+}
+
+.topic-delete-btn:hover {
+  background: var(--wrong-bg);
+  color: var(--wrong);
+}
+
+.topic-card-main {
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
 }
 
 /* --- Question --- */
@@ -449,7 +1072,7 @@ input:focus {
 
 .help-dialog {
   width: 100%;
-  max-width: 460px;
+  max-width: 640px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -649,6 +1272,14 @@ input:focus {
 
 .inactive-card:hover:not(:disabled) {
   border-color: var(--inactive);
+}
+
+.my-questions-card strong {
+  color: var(--accent);
+}
+
+.my-questions-card:hover:not(:disabled) {
+  border-color: var(--accent);
 }
 
 /* Quiz üst satırı: kapsam adı + toplam soru + skor */
@@ -934,9 +1565,35 @@ select {
   font-size: 0.9em;
 }
 
+.note-color-red {
+  color: var(--wrong);
+  font-weight: 600;
+}
+
+.note-color-blue {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.note-color-green {
+  color: var(--correct);
+  font-weight: 600;
+}
+
 .icon-btn {
   padding: 0.3rem 0.6rem;
   line-height: 1;
+}
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+.download-btn:hover {
+  color: var(--accent);
 }
 
 /* --- Result --- */
