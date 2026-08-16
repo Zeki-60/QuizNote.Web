@@ -123,6 +123,12 @@ export const api = {
       method: 'POST',
     }),
 
+  /** Kullanıcının bu sorudaki seviyesini doğrudan maksimuma (5) ayarlar. */
+  setMaxLevel: (questionId: string) =>
+    request<{ level: number; maxLevel: number }>(`/api/questions/${questionId}/max-level`, {
+      method: 'POST',
+    }),
+
   /** Bir soruyu (ve bağlı şıklarını) kalıcı olarak siler; bağlı not silinmez. */
   deleteQuestion: (questionId: string) =>
     request<void>(`/api/questions/${questionId}`, {

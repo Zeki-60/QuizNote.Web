@@ -29,6 +29,8 @@ interface Props {
   onShowNote: () => void;
   onBack: () => void;
   onToggleFavorite: () => void;
+  /** Bu sorudaki seviyeyi doğrudan maksimuma (5) ayarlar. */
+  onSetMaxLevel: () => void;
   /** Soruyu kalıcı olarak siler; kullanıcı onayı bu bileşen içinde alınır. */
   onDelete: () => void;
   onToggleStats: () => void;
@@ -52,6 +54,7 @@ export function QuestionCard({
   onShowNote,
   onBack,
   onToggleFavorite,
+  onSetMaxLevel,
   onDelete,
   onToggleStats,
   statsOpen,
@@ -149,9 +152,21 @@ export function QuestionCard({
         <div className="card">
           {/* Kartın içinde üst satır: solda geri, sağda "zorlananları sık sor" */}
           <div className="card-toolbar">
-            <button className="back-btn" onClick={onBack}>
-              ← Konulara dön
-            </button>
+            <div className="toolbar-left">
+              <button className="back-btn" onClick={onBack}>
+                ← Konulara dön
+              </button>
+
+              <button
+                type="button"
+                className="max-level-btn"
+                onClick={onSetMaxLevel}
+                disabled={question.level >= question.maxLevel}
+                title="Bu sorunun seviyesini maksimuma çıkar"
+              >
+                Max
+              </button>
+            </div>
 
             {scorePercent !== null && (
               <span

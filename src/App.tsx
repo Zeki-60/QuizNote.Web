@@ -380,6 +380,26 @@ export default function App() {
     }
   }
 
+  /** Sorunun seviyesini doğrudan maksimuma ayarlar. */
+  async function setMaxLevel() {
+    if (!question) return;
+
+    try {
+      const { level } = await api.setMaxLevel(question.id);
+      setQuestion((q) => (q ? { ...q, level } : q));
+
+       // Soru zaten cevaplanmışsa LevelStars result.level'ı gösterir; o da güncellensin.
+      setResult((r) => (r ? { ...r, level } : r));
+
+
+      // Puan (scorePercent) seviyeye bağlı; bilgi kartı ve rozet güncellensin.
+      void refreshScopeStats(activeTopic, { favoritesOnly, myQuestionsOnly });
+      setActionToast('Seviye maksimuma çıkarıldı.');
+    } catch (err) {
+      setQuizError(err instanceof Error ? err.message : 'Seviye güncellenemedi.');
+    }
+  }
+
   /** Soruyu kalıcı olarak siler; onay QuestionCard içinde alınır. */
   async function deleteQuestion() {
     if (!question) return;
@@ -676,6 +696,7 @@ export default function App() {
                 onShowNote={() => void showNote()}
                 onBack={leaveQuiz}
                 onToggleFavorite={() => void toggleFavorite()}
+                onSetMaxLevel={() => void setMaxLevel()}
                 onDelete={() => void deleteQuestion()}
                 onToggleStats={() => {
                   // Aynı anda iki panel açık olmasın: istatistikleri açarken notu kapat.

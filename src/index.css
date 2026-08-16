@@ -1104,6 +1104,13 @@ input:focus {
   padding: 0.4rem 0.85rem;
 }
 
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .back-btn {
   display: inline-flex;
   align-items: center;
@@ -1115,6 +1122,24 @@ input:focus {
   color: var(--text-dim);
   font-size: 0.85rem;
   white-space: nowrap;
+}
+
+/* Sorunun seviyesini doğrudan maksimuma çıkaran kısayol butonu. */
+.max-level-btn {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--star);
+  background: transparent;
+  color: var(--star);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.max-level-btn:hover:not(:disabled) {
+  background: var(--star);
+  color: var(--surface);
 }
 
 /* Yardım butonu: yuvarlak soru işareti */
