@@ -71,18 +71,21 @@ export function HelpDialog({ open, onClose }: Props) {
 
           <div className="help-item">
             <span className="help-icon" aria-hidden="true">
-              <svg viewBox="0 0 20 20" width="17" height="17" fill="none">
-                <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M5 15 15 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none">
+                <path
+                  d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m2 0-.6 9.6a1.5 1.5 0 0 1-1.5 1.4H8.1a1.5 1.5 0 0 1-1.5-1.4L6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </span>
             <div>
-              <strong>Pasifleştir</strong>
+              <strong>Sil</strong>
               <p>
-                Bu simgeye dokununca soru <strong>🚫 Aktif Olmayanlar</strong> listesine taşınır ve
-                artık normal akışta karşınıza çıkmaz. Bir soruyu artık görmek istemediğinizde kullanın;
-                Konular ekranındaki <strong>🚫 Aktif Olmayanlar</strong> kartından istediğiniz zaman
-                tekrar aktif hale getirebilirsiniz.
+                Bu simgeye dokununca, onayınız alındıktan sonra soru ve bağlı şıklar kalıcı
+                olarak silinir. Bu işlem geri alınamaz.
               </p>
             </div>
           </div>

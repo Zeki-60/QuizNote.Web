@@ -55,17 +55,6 @@ export function StatsPanel({ stats, open, scopeLabel, onClose }: Props) {
                   <span className="stat-tile-value">{stats.favoriteCount}</span>
                   <span className="stat-tile-label">Favori</span>
                 </div>
-
-                <div className="stat-tile stat-tile-inactive">
-                  <span className="stat-tile-icon" aria-hidden="true">
-                    <svg viewBox="0 0 20 20" width="17" height="17" fill="none">
-                      <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M5 15 15 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </span>
-                  <span className="stat-tile-value">{stats.inactiveCount}</span>
-                  <span className="stat-tile-label">Aktif olmayan</span>
-                </div>
               </div>
 
               <div className="stats-section">

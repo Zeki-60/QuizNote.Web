@@ -16,7 +16,6 @@
   --star: #f5b301;
   --star-empty: #2a2f3d;
   --fav: #f43f5e;
-  --inactive: #94a3b8;
   --shadow: rgba(0, 0, 0, 0.35);
   --radius: 10px;
 
@@ -40,7 +39,6 @@
   --star: #d97706;
   --star-empty: #c3c8d2;
   --fav: #e11d48;
-  --inactive: #475569;
   --shadow: rgba(15, 23, 42, 0.14);
 
   color-scheme: light;
@@ -755,10 +753,6 @@ input:focus {
   color: var(--fav);
 }
 
-.stat-tile-inactive .stat-tile-icon {
-  color: var(--inactive);
-}
-
 .stat-tile-value {
   font-size: 1.4rem;
   font-weight: 700;
@@ -1005,6 +999,7 @@ input:focus {
 /* --- Question --- */
 /* Kart içi üst satır: solda geri butonu, sağda seviye anahtarı. */
 .card-toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1015,10 +1010,98 @@ input:focus {
   flex-wrap: wrap;
 }
 
+.scope-score {
+  --score-color: var(--accent);
+
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.75rem 0.3rem 0.3rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.scope-score--low {
+  --score-color: var(--wrong);
+}
+
+.scope-score--mid {
+  --score-color: var(--star);
+}
+
+.scope-score--high {
+  --score-color: var(--correct);
+}
+
+/* Konik gradyanla çizilen mini ilerleme halkası; ortadaki delik yüzdeyi barındırır. */
+.scope-score-ring {
+  --ring-size: 1.7rem;
+
+  flex: none;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  border-radius: 50%;
+  background: conic-gradient(var(--score-color) var(--score-percent), var(--border) 0);
+  display: grid;
+  place-items: center;
+}
+
+.scope-score-ring::after {
+  content: '';
+  width: calc(var(--ring-size) - 0.5rem);
+  height: calc(var(--ring-size) - 0.5rem);
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+
+.scope-score-value {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--score-color);
+}
+
+.scope-score-max {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
 .toolbar-right {
   display: flex;
   align-items: center;
   gap: 0.7rem;
+}
+
+/* Belirli bir konu içindeyken sıra numarasıyla soruya atlama kutusu. */
+.order-index-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.order-index-jump input {
+  width: 5.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.order-index-jump input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Sayı okları tarayıcılar arası tutarlı olsun diye kaldırılmaz; varsayılan bırakılır. */
+.order-index-jump button {
+  padding: 0.4rem 0.85rem;
 }
 
 .back-btn {
@@ -1223,8 +1306,8 @@ input:focus {
   color: var(--fav);
 }
 
-/* --- Aktif olmayan (pasifleştirme) butonu --- */
-.inactive-btn {
+/* --- Soru silme butonu --- */
+.delete-question-btn {
   width: 2rem;
   height: 1.9rem;
   display: inline-flex;
@@ -1234,22 +1317,16 @@ input:focus {
   background: none;
   border: none;
   color: var(--text-dim);
-  font-size: 1.2rem;
-  line-height: 1;
   transition: color 0.15s, transform 0.15s;
 }
 
-.inactive-btn:hover:not(:disabled) {
-  color: var(--inactive);
+.delete-question-btn:hover:not(:disabled) {
+  color: var(--wrong);
   border-color: transparent;
   transform: scale(1.12);
 }
 
-.inactive-btn.active {
-  color: var(--inactive);
-}
-
-/* "Tümü", "Favorilerim" ve "Aktif Olmayanlar" kartları konu kartlarıyla aynı boyutta; renkle ayrılır. */
+/* "Tümü" ve "Favorilerim" kartları konu kartlarıyla aynı boyutta; renkle ayrılır. */
 .all-card strong {
   color: var(--accent);
 }
@@ -1266,14 +1343,6 @@ input:focus {
   border-color: var(--fav);
 }
 
-.inactive-card strong {
-  color: var(--inactive);
-}
-
-.inactive-card:hover:not(:disabled) {
-  border-color: var(--inactive);
-}
-
 .my-questions-card strong {
   color: var(--accent);
 }
@@ -1282,11 +1351,12 @@ input:focus {
   border-color: var(--accent);
 }
 
-/* Quiz üst satırı: kapsam adı + toplam soru + skor */
+/* Quiz üst satırı: kapsam adı + toplam soru + soru no arama + tür */
 .quiz-head {
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
   margin-bottom: 0.6rem;
 }
 

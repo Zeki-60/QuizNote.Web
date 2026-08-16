@@ -57,17 +57,16 @@ export interface Question {
   maxLevel: number;
   /** Kullanıcı bu soruyu favorilere eklemiş mi? */
   isFavorite: boolean;
-  /** Kullanıcı bu soruyu pasif (aktif olmayan) olarak işaretlemiş mi? */
-  isInactive: boolean;
 }
 
-/** Soru kartının yanındaki bilgi kartı: aktif kapsamdaki seviye dağılımı, favori ve pasif sayıları. */
+/** Soru kartının yanındaki bilgi kartı: aktif kapsamdaki seviye dağılımı ve favori sayısı. */
 export interface ScopeStats {
   totalQuestions: number;
   /** Index'i seviye (0-5), değeri o seviyedeki soru sayısı. */
   levelCounts: number[];
   favoriteCount: number;
-  inactiveCount: number;
+  /** 0-100 aralığında, kapsamdaki soruların seviye ortalamasından hesaplanan başarı puanı. */
+  scorePercent: number;
 }
 
 /** Düzenleme ekranındaki şık: doğru/yanlış bilgisi dahil, havuzdaki TÜM şıklar. */

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { QuestionType } from '../types';
 import type { AnswerResult, Question } from '../types';
 import { HelpDialog } from './HelpDialog';
@@ -9,9 +10,17 @@ interface Props {
   result: AnswerResult | null;
   submitting: boolean;
   loadingNext: boolean;
-  /** Üst satırda gösterilen kapsam adı: konu adı, "Tümü", "♥ Favorilerim" veya "🚫 Aktif Olmayanlar". */
+  /** Üst satırda gösterilen kapsam adı: konu adı, "Tümü", "♥ Favorilerim" veya "📝 Kendi Sorularım". */
   scopeLabel: string;
   totalQuestions: number;
+  /** Aktif kapsamdaki 0-100 arası başarı puanı; giriş yapılmamışsa veya henüz yüklenmemişse null. */
+  scorePercent: number | null;
+  /**
+   * Sıra numarasıyla belirli bir soruya atlama. Yalnızca belirli bir konu içindeyken
+   * (Tümü/Favorilerim/Kendi Sorularım'da değilken) dolu gelir; null ise arama
+   * kutusu hiç gösterilmez.
+   */
+  onJumpToOrderIndex: ((orderIndex: number) => void) | null;
   onSubmit: (payload: {
     selectedChoiceId?: string;
     pairs?: Record<string, string>;
@@ -20,7 +29,8 @@ interface Props {
   onShowNote: () => void;
   onBack: () => void;
   onToggleFavorite: () => void;
-  onToggleInactive: () => void;
+  /** Soruyu kalıcı olarak siler; kullanıcı onayı bu bileşen içinde alınır. */
+  onDelete: () => void;
   onToggleStats: () => void;
   statsOpen: boolean;
   onEdit: () => void;
@@ -35,12 +45,14 @@ export function QuestionCard({
   loadingNext,
   scopeLabel,
   totalQuestions,
+  scorePercent,
+  onJumpToOrderIndex,
   onSubmit,
   onNext,
   onShowNote,
   onBack,
   onToggleFavorite,
-  onToggleInactive,
+  onDelete,
   onToggleStats,
   statsOpen,
   onEdit,
@@ -51,9 +63,23 @@ export function QuestionCard({
   // leftId -> rightId eşleşmeleri
   const [pairs, setPairs] = useState<Record<string, string>>({});
   const [helpOpen, setHelpOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // App.tsx bu bileşeni her yeni soruda questionSeq key'iyle yeniden mount ettiği için,
+  // başlangıç değeri o an ekrandaki sorunun sıra numarasını otomatik gösterir.
+  const [orderIndexInput, setOrderIndexInput] = useState(
+    question.orderIndex > 0 ? String(question.orderIndex) : '',
+  );
 
   const answered = result !== null;
   const isMatching = question.type === QuestionType.Matching;
+
+  /** Sıra numarası kutusunda Enter'a basılınca veya "Git" tıklanınca tetiklenir. */
+  function handleJumpToOrderIndex() {
+    const parsed = Number(orderIndexInput);
+    if (!onJumpToOrderIndex || !orderIndexInput.trim() || !Number.isInteger(parsed) || parsed < 1) return;
+    onJumpToOrderIndex(parsed);
+    setOrderIndexInput('');
+  }
 
   /** Eşleştirmede son çift seçilince otomatik gönderir. */
   function handlePairChange(leftId: string, rightId: string) {
@@ -94,6 +120,28 @@ export function QuestionCard({
           <strong className="scope-label">{scopeLabel}</strong>
           {` · Toplam soru: ${totalQuestions}`}
         </span>
+
+        {onJumpToOrderIndex && (
+          <div className="order-index-jump">
+            <input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              placeholder="Soru no"
+              value={orderIndexInput}
+              onChange={(e) => setOrderIndexInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleJumpToOrderIndex();
+              }}
+              aria-label="Soru sıra numarasına git"
+              title="Bu konudaki bir sorunun sıra numarasını girip Enter'a basın"
+            />
+            <button type="button" onClick={handleJumpToOrderIndex} disabled={!orderIndexInput.trim()}>
+              Git
+            </button>
+          </div>
+        )}
+
         <span className="muted">{isMatching ? 'Eşleştirme' : 'Çoktan seçmeli'}</span>
       </div>
 
@@ -104,6 +152,18 @@ export function QuestionCard({
             <button className="back-btn" onClick={onBack}>
               ← Konulara dön
             </button>
+
+            {scorePercent !== null && (
+              <span
+                className={`scope-score scope-score--${scoreTier(scorePercent)}`}
+                title="Bu kapsamdaki ortalama başarı puanınız"
+                style={{ '--score-percent': `${scorePercent}%` } as CSSProperties}
+              >
+                <span className="scope-score-ring" aria-hidden="true" />
+                <span className="scope-score-value">{scorePercent}</span>
+                <span className="scope-score-max">/100</span>
+              </span>
+            )}
 
             <div className="toolbar-right">
               <label className="switch-row" title="Bir sonraki soruda geçerli olur">
@@ -131,6 +191,44 @@ export function QuestionCard({
 
           <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
 
+          {confirmDeleteOpen && (
+            <div className="modal-backdrop" onClick={() => setConfirmDeleteOpen(false)} role="presentation">
+              <div
+                className="modal"
+                role="dialog"
+                aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="modal-head">
+                  <h3>Soruyu Sil</h3>
+                  <button className="icon-btn" onClick={() => setConfirmDeleteOpen(false)} aria-label="Kapat">
+                    ✕
+                  </button>
+                </div>
+
+                <div className="modal-body">
+                  <p style={{ margin: 0 }}>Bu soruyu silmek istediğinize emin misiniz?</p>
+                  <p className="muted" style={{ marginTop: '0.5rem' }}>
+                    Soru ve bağlı şıklar kalıcı olarak silinir; bu işlem geri alınamaz.
+                  </p>
+                </div>
+
+                <div className="modal-actions">
+                  <button onClick={() => setConfirmDeleteOpen(false)}>Vazgeç</button>
+                  <button
+                    className="danger"
+                    onClick={() => {
+                      setConfirmDeleteOpen(false);
+                      onDelete();
+                    }}
+                  >
+                    Evet, Sil
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="question-head">
             <h2 className="question-text">{question.text}</h2>
 
@@ -146,20 +244,20 @@ export function QuestionCard({
               </button>
 
               <button
-                className={`inactive-btn${question.isInactive ? ' active' : ''}`}
-                onClick={onToggleInactive}
-                title={question.isInactive ? 'Aktif hale getir' : 'Pasifleştir (bir daha sorulmasın)'}
-                aria-label={question.isInactive ? 'Aktif hale getir' : 'Pasifleştir'}
-                aria-pressed={question.isInactive}
+                className="delete-question-btn"
+                onClick={() => setConfirmDeleteOpen(true)}
+                title="Soruyu sil"
+                aria-label="Soruyu sil"
               >
-                {question.isInactive ? (
-                  '🚫'
-                ) : (
-                  <svg viewBox="0 0 20 20" width="17" height="17" fill="none" aria-hidden="true">
-                    <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M5 15 15 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                )}
+                <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                  <path
+                    d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m2 0-.6 9.6a1.5 1.5 0 0 1-1.5 1.4H8.1a1.5 1.5 0 0 1-1.5-1.4L6 6"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
 
               <button
@@ -248,4 +346,11 @@ export function QuestionCard({
       </div>
     </div>
   );
+}
+
+/** Puan rozetinin rengini belirleyen eşik: düşük/orta/yüksek başarı. */
+function scoreTier(percent: number): 'low' | 'mid' | 'high' {
+  if (percent < 40) return 'low';
+  if (percent < 75) return 'mid';
+  return 'high';
 }

@@ -37,7 +37,6 @@ export default function App() {
   const [summary, setSummary] = useState({
     totalQuestions: 0,
     favoriteCount: 0,
-    inactiveCount: 0,
     myQuestionsCount: 0,
   });
   const [topicsError, setTopicsError] = useState<string | null>(null);
@@ -45,7 +44,6 @@ export default function App() {
   /** Seçili konu; null ise tüm konular havuza girer. */
   const [activeTopic, setActiveTopic] = useState<Topic | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [inactiveOnly, setInactiveOnly] = useState(false);
   const [myQuestionsOnly, setMyQuestionsOnly] = useState(false);
   const [question, setQuestion] = useState<Question | null>(null);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
@@ -103,7 +101,7 @@ export default function App() {
         api.getTopics(),
         api
           .summary()
-          .catch(() => ({ totalQuestions: 0, favoriteCount: 0, inactiveCount: 0, myQuestionsCount: 0 })),
+          .catch(() => ({ totalQuestions: 0, favoriteCount: 0, myQuestionsCount: 0 })),
       ]);
       setTopics(list);
       setSummary(sum);
@@ -164,9 +162,17 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleDownloadMyQuestions() {
+  /** Soru çözme ekranındaki aktif kapsamı (refreshScopeStats ile aynı öncelik sırasıyla) belirler. */
+  function currentExportScope(): { scope: 'topic' | 'favorites' | 'myQuestions' | 'all'; topicId?: string | null } {
+    if (favoritesOnly) return { scope: 'favorites' };
+    if (myQuestionsOnly) return { scope: 'myQuestions' };
+    if (activeTopic) return { scope: 'topic', topicId: activeTopic.id };
+    return { scope: 'all' };
+  }
+
+  async function handleDownloadQuestions() {
     try {
-      await api.downloadMyQuestionsExport();
+      await api.downloadQuestionsExport(currentExportScope());
     } catch (err) {
       // Sessiz geçilebilir bir işlem; hata olursa kısa bir uyarı yeterli.
       window.alert(err instanceof Error ? err.message : 'İndirme başarısız oldu.');
@@ -176,7 +182,6 @@ export default function App() {
   function resetQuiz() {
     setActiveTopic(null);
     setFavoritesOnly(false);
-    setInactiveOnly(false);
     setMyQuestionsOnly(false);
     setQuestion(null);
     setResult(null);
@@ -201,10 +206,11 @@ export default function App() {
   }
 
   /// Havuzdan sonraki soruyu çeker. Sonsuz akış: bitiş yok.
-  /// topic null ise tüm konular havuza girer.
+  /// topic null ise tüm konular havuza girer. orderIndex verilirse rastgelelik
+  /// devre dışı kalır; yalnızca o sıra numaralı soru istenir.
   async function loadNextQuestion(
     topic: Topic | null,
-    opts: { favoritesOnly: boolean; inactiveOnly: boolean; myQuestionsOnly: boolean; recent: string[] },
+    opts: { favoritesOnly: boolean; myQuestionsOnly: boolean; recent: string[]; orderIndex?: number | null },
   ) {
     setLoadingQuestion(true);
     setQuizError(null);
@@ -214,9 +220,9 @@ export default function App() {
         topicId: topic?.id ?? null,
         prioritizeHard,
         favoritesOnly: opts.favoritesOnly,
-        inactiveOnly: opts.inactiveOnly,
         myQuestionsOnly: opts.myQuestionsOnly,
         recentIds: opts.recent,
+        orderIndex: opts.orderIndex,
       });
 
       setQuestion(q);
@@ -234,20 +240,18 @@ export default function App() {
     }
   }
 
-  /** Aktif kapsamın (konu/favoriler/aktif olmayanlar/kendi sorularım/tümü) bilgi kartını tazeler. */
+  /** Aktif kapsamın (konu/favoriler/kendi sorularım/tümü) bilgi kartını tazeler. */
   async function refreshScopeStats(
     topic: Topic | null,
-    opts: { favoritesOnly: boolean; inactiveOnly: boolean; myQuestionsOnly: boolean },
+    opts: { favoritesOnly: boolean; myQuestionsOnly: boolean },
   ) {
-    const scope = opts.inactiveOnly
-      ? 'inactive'
-      : opts.favoritesOnly
-        ? 'favorites'
-        : opts.myQuestionsOnly
-          ? 'myQuestions'
-          : topic
-            ? 'topic'
-            : 'all';
+    const scope = opts.favoritesOnly
+      ? 'favorites'
+      : opts.myQuestionsOnly
+        ? 'myQuestions'
+        : topic
+          ? 'topic'
+          : 'all';
     try {
       setScopeStats(await api.getScopeStats({ scope, topicId: topic?.id ?? null }));
     } catch {
@@ -255,21 +259,19 @@ export default function App() {
     }
   }
 
-  /// topic null ise tüm konulardan sorulur. mode: 'all' | 'favorites' | 'inactive' | 'myQuestions'.
+  /// topic null ise tüm konulardan sorulur. mode: 'all' | 'favorites' | 'myQuestions'.
   async function startTopic(
     topic: Topic | null,
-    mode: 'all' | 'favorites' | 'inactive' | 'myQuestions' = 'all',
+    mode: 'all' | 'favorites' | 'myQuestions' = 'all',
   ) {
     const onlyFavorites = mode === 'favorites';
-    const onlyInactive = mode === 'inactive';
     const onlyMyQuestions = mode === 'myQuestions';
     setActiveTopic(topic);
     setFavoritesOnly(onlyFavorites);
-    setInactiveOnly(onlyInactive);
     setMyQuestionsOnly(onlyMyQuestions);
     setRecentIds([]);
     setView('quiz');
-    const opts = { favoritesOnly: onlyFavorites, inactiveOnly: onlyInactive, myQuestionsOnly: onlyMyQuestions };
+    const opts = { favoritesOnly: onlyFavorites, myQuestionsOnly: onlyMyQuestions };
     await Promise.all([
       loadNextQuestion(topic, { ...opts, recent: [] }),
       refreshScopeStats(topic, opts),
@@ -296,7 +298,7 @@ export default function App() {
       // Cevap yanıtı notu zaten taşıyor; panel açılırsa ek istek gerekmez.
       setNote(res.note);
       // Seviye değişmiş olabilir; bilgi kartındaki dağılım güncellensin.
-      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
+      void refreshScopeStats(activeTopic, { favoritesOnly, myQuestionsOnly });
     } catch (err) {
       setQuizError(err instanceof Error ? err.message : 'Cevap gönderilemedi.');
     } finally {
@@ -311,40 +313,38 @@ export default function App() {
       setFavoritesOnly(false);
       await loadNextQuestion(activeTopic, {
         favoritesOnly: false,
-        inactiveOnly,
         myQuestionsOnly,
         recent: recentIds,
       });
       return;
     }
 
-    // Aktif olmayanlar modunda son pasif soru da aktif edilmişse havuz boşalır;
-    // aynı şekilde normal akışa düşülür.
-    if (inactiveOnly && summary.inactiveCount === 0) {
-      setInactiveOnly(false);
-      await loadNextQuestion(activeTopic, {
-        favoritesOnly,
-        inactiveOnly: false,
-        myQuestionsOnly,
-        recent: recentIds,
-      });
-      return;
-    }
-
-    // Kendi sorularım modunda son soru da silinmişse/başkasına devredilmişse
-    // (şu an silme yok ama tutarlılık için) aynı fallback uygulanır.
+    // Kendi sorularım modunda son soru da silinmişse havuz boşalır; aynı fallback uygulanır.
     if (myQuestionsOnly && summary.myQuestionsCount === 0) {
       setMyQuestionsOnly(false);
       await loadNextQuestion(activeTopic, {
         favoritesOnly,
-        inactiveOnly,
         myQuestionsOnly: false,
         recent: recentIds,
       });
       return;
     }
 
-    await loadNextQuestion(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly, recent: recentIds });
+    await loadNextQuestion(activeTopic, { favoritesOnly, myQuestionsOnly, recent: recentIds });
+  }
+
+  /**
+   * Belirli bir sıra numarasındaki soruya atlar. Yalnızca belirli bir konu içindeyken
+   * (Tümü/Favorilerim/Kendi Sorularım'da değilken) kullanılabilir; QuestionCard bu
+   * şartı zaten kontrol edip alanı yalnızca o durumda gösterir.
+   */
+  async function jumpToOrderIndex(orderIndex: number) {
+    await loadNextQuestion(activeTopic, {
+      favoritesOnly: false,
+      myQuestionsOnly: false,
+      recent: recentIds,
+      orderIndex,
+    });
   }
 
   /** Düzenleme modalından kaydedince ekrandaki soru metnini ve (açıksa) notu günceller. */
@@ -373,29 +373,33 @@ export default function App() {
         ...s,
         favoriteCount: Math.max(0, s.favoriteCount + (isFavorite ? 1 : -1)),
       }));
-      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
+      void refreshScopeStats(activeTopic, { favoritesOnly, myQuestionsOnly });
       setActionToast(isFavorite ? 'Favorilere eklendi.' : 'Favorilerden çıkarıldı.');
     } catch (err) {
       setQuizError(err instanceof Error ? err.message : 'Favori güncellenemedi.');
     }
   }
 
-  async function toggleInactive() {
+  /** Soruyu kalıcı olarak siler; onay QuestionCard içinde alınır. */
+  async function deleteQuestion() {
     if (!question) return;
 
     try {
-      const { isInactive } = await api.toggleInactive(question.id);
-      setQuestion((q) => (q ? { ...q, isInactive } : q));
-      // "Aktif Olmayanlar" kartı bu sayıya bakıyor; anında güncellenir ki quiz'den
-      // dönünce kart doğru durumda olsun.
+      await api.deleteQuestion(question.id);
       setSummary((s) => ({
         ...s,
-        inactiveCount: Math.max(0, s.inactiveCount + (isInactive ? 1 : -1)),
+        totalQuestions: Math.max(0, s.totalQuestions - 1),
+        favoriteCount: question.isFavorite ? Math.max(0, s.favoriteCount - 1) : s.favoriteCount,
+        // Sorunun kendi sahipliği ekrana taşınmıyor; "Kendi Sorularım" kapsamındaysak
+        // gösterilen soru zaten kullanıcıya ait demektir.
+        myQuestionsCount: myQuestionsOnly ? Math.max(0, s.myQuestionsCount - 1) : s.myQuestionsCount,
       }));
-      void refreshScopeStats(activeTopic, { favoritesOnly, inactiveOnly, myQuestionsOnly });
-      setActionToast(isInactive ? 'Soru aktif olmayanlara taşındı.' : 'Soru tekrar aktif edildi.');
+      setActionToast('Soru silindi.');
+      // Silinen sorunun yerine sonraki soru yüklenir; havuz boşalmışsa nextQuestion
+      // ilgili fallback'i (favoritesOnly/myQuestionsOnly kapatma) zaten uyguluyor.
+      await nextQuestion();
     } catch (err) {
-      setQuizError(err instanceof Error ? err.message : 'Durum güncellenemedi.');
+      setQuizError(err instanceof Error ? err.message : 'Soru silinemedi.');
     }
   }
 
@@ -461,22 +465,24 @@ export default function App() {
         </div>
         <div className="topbar-right">
           <span>{user.displayName}</span>
-          <button
-            className="icon-btn download-btn"
-            onClick={() => void handleDownloadMyQuestions()}
-            title="Kendi sorularımı indir (.txt)"
-            aria-label="Kendi sorularımı indir"
-          >
-            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
-              <path
-                d="M10 3v10m0 0-3.5-3.5M10 13l3.5-3.5M4 15.5h12"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {view === 'quiz' && (
+            <button
+              className="icon-btn download-btn"
+              onClick={() => void handleDownloadQuestions()}
+              title="Bu kapsamdaki soruları indir (.txt)"
+              aria-label="Bu kapsamdaki soruları indir"
+            >
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+                <path
+                  d="M10 3v10m0 0-3.5-3.5M10 13l3.5-3.5M4 15.5h12"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
           {themeSwitch}
           <button onClick={handleLogout}>Çıkış</button>
         </div>
@@ -528,7 +534,7 @@ export default function App() {
             )}
 
             <div className="topic-grid">
-              {/* Sıra sabit: 1) Tümü, 2) Favorilerim, 3) Aktif Olmayanlar, 4) Kendi Sorularım, sonra konular. */}
+              {/* Sıra sabit: 1) Tümü, 2) Favorilerim, 3) Kendi Sorularım, sonra konular. */}
               <button
                 className="card topic-card all-card"
                 disabled={summary.totalQuestions === 0}
@@ -549,19 +555,6 @@ export default function App() {
                 onClick={() => void startTopic(null, 'favorites')}
               >
                 <strong>♥ Favorilerim</strong>
-              </button>
-
-              <button
-                className="card topic-card inactive-card"
-                disabled={summary.inactiveCount === 0}
-                title={
-                  summary.inactiveCount === 0
-                    ? 'Henüz aktif olmayan sorunuz yok'
-                    : 'Sadece aktif olmayan soruları çalış'
-                }
-                onClick={() => void startTopic(null, 'inactive')}
-              >
-                <strong>🚫 Aktif Olmayanlar</strong>
               </button>
 
               <button
@@ -657,29 +650,33 @@ export default function App() {
                 submitting={submitting}
                 loadingNext={loadingQuestion}
                 scopeLabel={
-                  inactiveOnly
-                    ? '🚫 Aktif Olmayanlar'
-                    : favoritesOnly
-                      ? '♥ Favorilerim'
-                      : myQuestionsOnly
-                        ? '📝 Kendi Sorularım'
-                        : (activeTopic?.name ?? 'Tümü')
+                  favoritesOnly
+                    ? '♥ Favorilerim'
+                    : myQuestionsOnly
+                      ? '📝 Kendi Sorularım'
+                      : (activeTopic?.name ?? 'Tümü')
                 }
                 totalQuestions={
-                  inactiveOnly
-                    ? summary.inactiveCount
-                    : favoritesOnly
-                      ? summary.favoriteCount
-                      : myQuestionsOnly
-                        ? summary.myQuestionsCount
-                        : (activeTopic?.questionCount ?? summary.totalQuestions)
+                  favoritesOnly
+                    ? summary.favoriteCount
+                    : myQuestionsOnly
+                      ? summary.myQuestionsCount
+                      : (activeTopic?.questionCount ?? summary.totalQuestions)
+                }
+                scorePercent={scopeStats?.scorePercent ?? null}
+                // Sıra numarasıyla arama yalnızca belirli bir konu içindeyken anlamlı;
+                // Tümü/Favorilerim/Kendi Sorularım'da gösterilmez.
+                onJumpToOrderIndex={
+                  activeTopic && !favoritesOnly && !myQuestionsOnly
+                    ? (orderIndex) => void jumpToOrderIndex(orderIndex)
+                    : null
                 }
                 onSubmit={submitAnswer}
                 onNext={() => void nextQuestion()}
                 onShowNote={() => void showNote()}
                 onBack={leaveQuiz}
                 onToggleFavorite={() => void toggleFavorite()}
-                onToggleInactive={() => void toggleInactive()}
+                onDelete={() => void deleteQuestion()}
                 onToggleStats={() => {
                   // Aynı anda iki panel açık olmasın: istatistikleri açarken notu kapat.
                   setNoteOpen(false);
@@ -712,13 +709,11 @@ export default function App() {
         stats={scopeStats}
         open={statsOpen}
         scopeLabel={
-          inactiveOnly
-            ? '🚫 Aktif Olmayanlar'
-            : favoritesOnly
-              ? '♥ Favorilerim'
-              : myQuestionsOnly
-                ? '📝 Kendi Sorularım'
-                : (activeTopic?.name ?? 'Tümü')
+          favoritesOnly
+            ? '♥ Favorilerim'
+            : myQuestionsOnly
+              ? '📝 Kendi Sorularım'
+              : (activeTopic?.name ?? 'Tümü')
         }
         onClose={() => setStatsOpen(false)}
       />

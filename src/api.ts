@@ -92,26 +92,28 @@ export const api = {
 
   /**
    * Sonsuz akış: havuzdan tek soru çeker. topicId verilmezse tüm konular havuza girer.
-   * recentIds son sorulanları dışlar.
+   * recentIds son sorulanları dışlar. orderIndex verilirse rastgelelik devre dışı
+   * kalır; yalnızca o sıra numarasına sahip soru döner (yalnızca bir konu içindeyken
+   * ve favoritesOnly/myQuestionsOnly kapalıyken kullanılabilir).
    */
   getNextQuestion: (
     opts: {
       topicId?: string | null;
       prioritizeHard?: boolean;
       favoritesOnly?: boolean;
-      inactiveOnly?: boolean;
       myQuestionsOnly?: boolean;
       recentIds?: string[];
+      orderIndex?: number | null;
     } = {},
   ) => {
     const params = new URLSearchParams({
       prioritizeHard: String(opts.prioritizeHard ?? false),
       favoritesOnly: String(opts.favoritesOnly ?? false),
-      inactiveOnly: String(opts.inactiveOnly ?? false),
       myQuestionsOnly: String(opts.myQuestionsOnly ?? false),
     });
     if (opts.topicId) params.set('topicId', opts.topicId);
     if (opts.recentIds?.length) params.set('excludeIds', opts.recentIds.join(','));
+    if (opts.orderIndex != null) params.set('orderIndex', String(opts.orderIndex));
 
     return request<Question>(`/api/next-question?${params}`);
   },
@@ -121,22 +123,22 @@ export const api = {
       method: 'POST',
     }),
 
-  toggleInactive: (questionId: string) =>
-    request<{ isInactive: boolean }>(`/api/questions/${questionId}/inactive`, {
-      method: 'POST',
+  /** Bir soruyu (ve bağlı şıklarını) kalıcı olarak siler; bağlı not silinmez. */
+  deleteQuestion: (questionId: string) =>
+    request<void>(`/api/questions/${questionId}`, {
+      method: 'DELETE',
     }),
 
   summary: () =>
     request<{
       totalQuestions: number;
       favoriteCount: number;
-      inactiveCount: number;
       myQuestionsCount: number;
     }>('/api/me/summary'),
 
-  /** Soru kartının yanındaki bilgi kartı için: aktif kapsamın seviye/favori/pasif istatistikleri. */
+  /** Soru kartının yanındaki bilgi kartı için: aktif kapsamın seviye/favori istatistikleri. */
   getScopeStats: (opts: {
-    scope: 'topic' | 'favorites' | 'inactive' | 'myQuestions' | 'all';
+    scope: 'topic' | 'favorites' | 'myQuestions' | 'all';
     topicId?: string | null;
   }) => {
     const params = new URLSearchParams({ scope: opts.scope });
@@ -208,23 +210,36 @@ export const api = {
     }),
 
   /**
-   * Kullanıcının kendi eklediği soruları/notları DbSeeder formatında .txt olarak indirir.
-   * JSON değil düz metin döndüğü için genel request() yardımcısı kullanılmaz; dosya
-   * doğrudan tarayıcıda indirilir.
+   * Soru çözme ekranındaki aktif kapsama göre soruları/notları DbSeeder formatında
+   * .txt olarak indirir. JSON değil düz metin döndüğü için genel request() yardımcısı
+   * kullanılmaz; dosya doğrudan tarayıcıda indirilir.
    */
-  downloadMyQuestionsExport: async () => {
+  downloadQuestionsExport: async (opts: {
+    scope: 'topic' | 'favorites' | 'myQuestions' | 'all';
+    topicId?: string | null;
+  }) => {
     const token = tokenStore.get();
     const headers = new Headers();
     if (token) headers.set('Authorization', `Bearer ${token}`);
 
-    const res = await fetch(`${BASE_URL}/api/me/questions/export`, { headers });
+    const params = new URLSearchParams({ scope: opts.scope });
+    if (opts.topicId) params.set('topicId', opts.topicId);
+
+    const res = await fetch(`${BASE_URL}/api/questions/export?${params}`, { headers });
     if (!res.ok) throw new Error(`İndirme başarısız (${res.status})`);
+
+    const fileNames: Record<typeof opts.scope, string> = {
+      topic: 'konu-sorulari.txt',
+      favorites: 'favori-sorularim.txt',
+      myQuestions: 'kendi-sorularim.txt',
+      all: 'tum-sorular.txt',
+    };
 
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'kendi-sorularim.txt';
+    a.download = fileNames[opts.scope];
     document.body.appendChild(a);
     a.click();
     a.remove();
