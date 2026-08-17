@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { QuestionType } from '../types';
 import type { AnswerResult, Question } from '../types';
@@ -26,6 +26,7 @@ interface Props {
     pairs?: Record<string, string>;
   }) => void;
   onNext: () => void;
+  /** Not panelini açar/kapatır (toggle); "F" kısayolu ve buton bunu çağırır. */
   onShowNote: () => void;
   onBack: () => void;
   onToggleFavorite: () => void;
@@ -115,6 +116,74 @@ export function QuestionCard({
     if (!answered || !result.correctPairs) return 'match-row';
     return pairs[leftId] === result.correctPairs[leftId] ? 'match-row correct' : 'match-row wrong';
   }
+
+  // Klavye kısayolları: Space → sonraki soru, A-E → o sıradaki şıkkı seç.
+  // Bir input/textarea/select/button'a odaklanılmışken (örn. soru no arama kutusu,
+  // checkbox/switch) devre dışı kalır; harfler yalnızca çoktan seçmeli sorularda çalışır.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target instanceof HTMLButtonElement;
+
+      // Bir modal (yardım, silme onayı) açıkken kısayollar devre dışı kalır.
+      const modalOpen = helpOpen || confirmDeleteOpen;
+
+      if (e.key === ' ' || e.code === 'Space') {
+        if (isTyping || modalOpen || loadingNext) return;
+        e.preventDefault();
+        onNext();
+        return;
+      }
+
+      // "F" notu açar/kapatır; cevaplanmış olsa da her zaman çalışır.
+      if (e.key.toLowerCase() === 'f') {
+        if (isTyping || modalOpen) return;
+        e.preventDefault();
+        onShowNote();
+        return;
+      }
+
+      // "G" favoriye ekler/çıkarır; cevaplanmış olsa da her zaman çalışır.
+      if (e.key.toLowerCase() === 'g') {
+        if (isTyping || modalOpen) return;
+        e.preventDefault();
+        onToggleFavorite();
+        return;
+      }
+
+      if (isTyping || modalOpen || isMatching || answered || submitting) return;
+
+      const letterIndex = 'abcde'.indexOf(e.key.toLowerCase());
+      if (letterIndex === -1) return;
+
+      const choice = question.choices[letterIndex];
+      if (!choice) return;
+
+      e.preventDefault();
+      handleChoiceClick(choice.id);
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // handleChoiceClick her render'da yeniden oluşur ama question/answered/submitting
+    // değiştiğinde zaten efekt yeniden kurulur; ek bağımlılık gerekmez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    question,
+    answered,
+    submitting,
+    isMatching,
+    loadingNext,
+    onNext,
+    onShowNote,
+    onToggleFavorite,
+    helpOpen,
+    confirmDeleteOpen,
+  ]);
 
   return (
     <div>

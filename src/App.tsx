@@ -423,7 +423,13 @@ export default function App() {
     }
   }
 
+  /** Not panelini açar; zaten açıksa kapatır. */
   async function showNote() {
+    if (noteOpen) {
+      setNoteOpen(false);
+      return;
+    }
+
     // Aynı anda iki panel açık olmasın: notu açarken istatistikleri kapat.
     setStatsOpen(false);
     setNoteOpen(true);
