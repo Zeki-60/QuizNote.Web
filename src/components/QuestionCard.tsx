@@ -32,6 +32,8 @@ interface Props {
   onToggleFavorite: () => void;
   /** Bu sorudaki seviyeyi doğrudan maksimuma (5) ayarlar. */
   onSetMaxLevel: () => void;
+  /** Resim modalını açar; buton metni sorunun resmi olup olmadığına göre değişir. */
+  onOpenImageModal: () => void;
   /** Soruyu kalıcı olarak siler; kullanıcı onayı bu bileşen içinde alınır. */
   onDelete: () => void;
   onToggleStats: () => void;
@@ -56,6 +58,7 @@ export function QuestionCard({
   onBack,
   onToggleFavorite,
   onSetMaxLevel,
+  onOpenImageModal,
   onDelete,
   onToggleStats,
   statsOpen,
@@ -234,6 +237,10 @@ export function QuestionCard({
                 title="Bu sorunun seviyesini maksimuma çıkar"
               >
                 Max
+              </button>
+
+              <button type="button" className="image-btn" onClick={onOpenImageModal}>
+                {question.imageUrl ? '🖼 Resmi gör' : '🖼 Resim ekle'}
               </button>
             </div>
 

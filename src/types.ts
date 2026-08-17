@@ -57,6 +57,16 @@ export interface Question {
   maxLevel: number;
   /** Kullanıcı bu soruyu favorilere eklemiş mi? */
   isFavorite: boolean;
+  /** Soruya bağlı resmin URL'i (BASE_URL ile birleştirilmeden, API'nin döndürdüğü göreli yol); yoksa null. */
+  imageUrl: string | null;
+}
+
+/** Resim havuzundaki bir kayıt; arama/listeleme sonuçlarında kullanılır. */
+export interface QuestionImage {
+  id: string;
+  fileName: string;
+  url: string;
+  uploadedAt: string;
 }
 
 /** Soru kartının yanındaki bilgi kartı: aktif kapsamdaki seviye dağılımı ve favori sayısı. */

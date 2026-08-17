@@ -6,11 +6,12 @@ import type {
   Note,
   Question,
   QuestionEdit,
+  QuestionImage,
   ScopeStats,
   Topic,
 } from './types';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5080';
+export const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5080';
 const TOKEN_KEY = 'quiznote.token';
 
 export const tokenStore = {
@@ -213,6 +214,54 @@ export const api = {
     request<{ id: string }>('/api/questions', {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  // --- Soru resimleri ---
+
+  /** Resim havuzunda isme göre arar; search boşsa en son yüklenenleri döner. */
+  searchImages: (search: string) => {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('search', search.trim());
+    return request<QuestionImage[]>(`/api/images?${params}`);
+  },
+
+  /**
+   * Bilgisayardan bir resim dosyası yükler; multipart/form-data gönderdiği için
+   * genel request() yardımcısı kullanılmaz (Content-Type: application/json set eder).
+   */
+  uploadImage: async (file: File): Promise<QuestionImage> => {
+    const token = tokenStore.get();
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    const form = new FormData();
+    form.append('file', file);
+
+    const res = await fetch(`${BASE_URL}/api/images`, { method: 'POST', headers, body: form });
+    if (!res.ok) {
+      let message = `Yükleme başarısız (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.message) message = body.message;
+      } catch {
+        /* gövde JSON değilse varsayılan mesaj kalır */
+      }
+      throw new Error(message);
+    }
+    return res.json();
+  },
+
+  /** Bir soruya (havuzdaki mevcut veya yeni yüklenmiş) bir resmi bağlar. */
+  setQuestionImage: (questionId: string, imageId: string) =>
+    request<void>(`/api/questions/${questionId}/image`, {
+      method: 'PUT',
+      body: JSON.stringify({ imageId }),
+    }),
+
+  /** Sorudan resim bağını kaldırır; resmin kendisi havuzdan silinmez. */
+  removeQuestionImage: (questionId: string) =>
+    request<void>(`/api/questions/${questionId}/image`, {
+      method: 'DELETE',
     }),
 
   /**

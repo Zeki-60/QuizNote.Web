@@ -5,6 +5,7 @@ import { AddTopicModal } from './components/AddTopicModal';
 import { AuthForm } from './components/AuthForm';
 import { DeleteTopicModal } from './components/DeleteTopicModal';
 import { EditTopicModal } from './components/EditTopicModal';
+import { ImageModal } from './components/ImageModal';
 import { NotePanel } from './components/NotePanel';
 import { QuestionCard } from './components/QuestionCard';
 import { QuestionEditModal } from './components/QuestionEditModal';
@@ -67,6 +68,9 @@ export default function App() {
 
   /** Soru düzenleme modalı: açıkken düzenlenen sorunun id'si, kapalıyken null. */
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+
+  /** Resim modalı: açıkken resmi gösterilen/düzenlenen sorunun id'si, kapalıyken null. */
+  const [imageModalQuestionId, setImageModalQuestionId] = useState<string | null>(null);
 
   const [addTopicOpen, setAddTopicOpen] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
@@ -703,6 +707,7 @@ export default function App() {
                 onBack={leaveQuiz}
                 onToggleFavorite={() => void toggleFavorite()}
                 onSetMaxLevel={() => void setMaxLevel()}
+                onOpenImageModal={() => setImageModalQuestionId(question.id)}
                 onDelete={() => void deleteQuestion()}
                 onToggleStats={() => {
                   // Aynı anda iki panel açık olmasın: istatistikleri açarken notu kapat.
@@ -749,6 +754,13 @@ export default function App() {
         questionId={editingQuestionId}
         onClose={() => setEditingQuestionId(null)}
         onSaved={() => void refreshEditedQuestion()}
+      />
+
+      <ImageModal
+        questionId={imageModalQuestionId}
+        imageUrl={question?.imageUrl ?? null}
+        onClose={() => setImageModalQuestionId(null)}
+        onImageChange={(imageUrl) => setQuestion((q) => (q ? { ...q, imageUrl } : q))}
       />
 
       <AddTopicModal
