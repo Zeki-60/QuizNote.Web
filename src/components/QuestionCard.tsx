@@ -158,6 +158,14 @@ export function QuestionCard({
         return;
       }
 
+      // "V" seviyeyi maksimuma çıkarır; Max butonu gibi zaten maksimumdaysa çalışmaz.
+      if (e.key.toLowerCase() === 'v') {
+        if (isTyping || modalOpen || question.level >= question.maxLevel) return;
+        e.preventDefault();
+        onSetMaxLevel();
+        return;
+      }
+
       if (isTyping || modalOpen || isMatching || answered || submitting) return;
 
       const letterIndex = 'abcde'.indexOf(e.key.toLowerCase());
@@ -184,6 +192,7 @@ export function QuestionCard({
     onNext,
     onShowNote,
     onToggleFavorite,
+    onSetMaxLevel,
     helpOpen,
     confirmDeleteOpen,
   ]);
@@ -194,6 +203,11 @@ export function QuestionCard({
         <span className="muted">
           <strong className="scope-label">{scopeLabel}</strong>
           {` · Toplam soru: ${totalQuestions}`}
+          {/* Tümü/Favorilerim/Kendi Sorularım gibi konudan bağımsız kapsamlarda
+              (onJumpToOrderIndex null'sa) sorunun hangi konudan geldiğini göster. */}
+          {!onJumpToOrderIndex && (
+            <span className="question-topic-tag"> · {question.topicName}</span>
+          )}
         </span>
 
         {onJumpToOrderIndex && (
@@ -251,7 +265,7 @@ export function QuestionCard({
                 style={{ '--score-percent': `${scorePercent}%` } as CSSProperties}
               >
                 <span className="scope-score-ring" aria-hidden="true" />
-                <span className="scope-score-value">{scorePercent}</span>
+                <span className="scope-score-value">{scorePercent.toFixed(2)}</span>
                 <span className="scope-score-max">/100</span>
               </span>
             )}

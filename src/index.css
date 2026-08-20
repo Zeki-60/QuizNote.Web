@@ -1389,6 +1389,13 @@ input:focus {
   color: var(--text);
 }
 
+/* Tümü/Favorilerim/Kendi Sorularım gibi konudan bağımsız kapsamlarda, o an
+   ekrandaki sorunun ait olduğu konuyu belirtir. */
+.question-topic-tag {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* --- Seviye yıldızları --- */
 .level-stars {
   display: inline-flex;
@@ -1716,8 +1723,9 @@ select {
 }
 
 .image-modal {
-  max-width: 900px;
-  width: 90vw;
+  max-width: 1400px;
+  width: 96vw;
+  max-height: 96vh;
 }
 
 .image-modal-tabs {
@@ -1749,7 +1757,7 @@ select {
 
 .image-modal-preview img {
   max-width: 100%;
-  max-height: 70vh;
+  max-height: 82vh;
   border-radius: var(--radius);
   border: 1px solid var(--border);
 }

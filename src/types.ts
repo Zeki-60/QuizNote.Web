@@ -59,6 +59,9 @@ export interface Question {
   isFavorite: boolean;
   /** Soruya bağlı resmin URL'i (BASE_URL ile birleştirilmeden, API'nin döndürdüğü göreli yol); yoksa null. */
   imageUrl: string | null;
+  /** Sorunun ait olduğu konunun adı; Tümü/Favorilerim/Kendi Sorularım gibi konudan
+   * bağımsız kapsamlarda hangi konudan geldiğini göstermek için kullanılır. */
+  topicName: string;
 }
 
 /** Resim havuzundaki bir kayıt; arama/listeleme sonuçlarında kullanılır. */
@@ -75,7 +78,7 @@ export interface ScopeStats {
   /** Index'i seviye (0-5), değeri o seviyedeki soru sayısı. */
   levelCounts: number[];
   favoriteCount: number;
-  /** 0-100 aralığında, kapsamdaki soruların seviye ortalamasından hesaplanan başarı puanı. */
+  /** 0-100 aralığında, kapsamdaki soruların seviye ortalamasından hesaplanan başarı puanı (2 ondalık basamak). */
   scorePercent: number;
 }
 
